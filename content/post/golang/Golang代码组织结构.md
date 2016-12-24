@@ -4,7 +4,7 @@ title = "Golang代码组织结构"
 tags = [
   "golang"
 ]
-draft = true
+draft = false
 topics = [
   "topic 1",
 ]
@@ -53,10 +53,10 @@ Program execution begins by initializing the main package and then invoking the 
 
 如果要再简单直白一点
 
-- 一个包就是一个目录，包名就是目录名
+- 一个包就是一个目录，包名就是目录名（其实一个目录下是可以有多个包存在的，用前边这种方式可以让代码结构简单明了）
 - 目录下存放该包里的所有文件
 - 每个包中可以有多个init函数，该函数会在import包时被自动调用
-- 整个程序的入口为一个`main`函数，该函数属于一个不被引用的包`main`包。
+- 整个程序的入口为一个`main`函数，该函数没有参数，没有返回值，属于一个不被引用的包`main`包。
 
 也可以用一张图来概括
 ![](http://ohrdj7osp.bkt.clouddn.com/20150416173122272.png)

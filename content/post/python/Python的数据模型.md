@@ -287,241 +287,261 @@ CPython实现细节：CPython现在使用引用计数机制和（可选的）循
  
 在实现要模拟任意内建类型的类时，需要特别指出的是 “模拟” 只是达到了满足使用的程度，这点需要特别指出。例如，获取某些序列的单个元素是正常的，但使用切片却是没有意义的（一个例子是在W3C文档对象模型中的`NodeList`接口。）
 
-* 3.1 基础定制  
-    * object.\_\_new\_\_(cls[, ...])  
+#### 3.1 基础定制  
+* object.\_\_new\_\_(cls[, ...])  
     调用时创建类`cls`的实例。`__new()`是一个静态方法（特殊函数所以你不需要定义），第一个参数是需要创建实例等类。其余的参数会创递给实例构造器（调用类）。`__new()__`的返回值是类的新对象实例（通常是`cls`的实例）。  
 
-        常见的情况下是通过`super(currentclass, cls).__new__(cls[, ...])`的方式，传递对应的参数调用父类的`__new__()`的来实现创建一个类的新实例，然后再返回实例之前根据需求对实例进行相应的修改。  
+    常见的情况下是通过`super(currentclass, cls).__new__(cls[, ...])`的方式，传递对应的参数调用父类的`__new__()`的来实现创建一个类的新实例，然后再返回实例之前根据需求对实例进行相应的修改。  
     
-        如果`__new__()`返回类`cls`的新实例，那么新实例的`__init__()`方法将会被调用`__init__(self[, ...])`，`self`就是新实例自己，其余参数就是传递给`__new__()`的参数。  
+    如果`__new__()`返回类`cls`的新实例，那么新实例的`__init__()`方法将会被调用`__init__(self[, ...])`，`self`就是新实例自己，其余参数就是传递给`__new__()`的参数。  
     
-        如果`__new__()`返回的不是类`cls`的实例，那么新实例的`__init__`方法不会被调用。  
+    如果`__new__()`返回的不是类`cls`的实例，那么新实例的`__init__`方法不会被调用。  
     
-        `__new__`方法主要用于让不可变类型的子类（比如：int，str，tuple）可以定制化实例的创建。在自定义`metaclass`的时候，这个函数也经常被覆盖，以定制类的创建。
+    `__new__`方法主要用于让不可变类型的子类（比如：int，str，tuple）可以定制化实例的创建。在自定义`metaclass`的时候，这个函数也经常被覆盖，以定制类的创建。
     
-    * object.\_\_init\_\_(self[, ...])  
-      实例被`__new__()`创建以后，并在返回调用者之前被调用。参数就是那些传递给类构造表达式的值。如果基类有`__init__()`方法，推断类的`__init__()`方法，如果有，必须显示的调用它来确保新实例中基类的部分被正确的初始化；比如：`BaseClass.__init__(self, [args...])`。
+* object.\_\_init\_\_(self[, ...])  
+    实例被`__new__()`创建以后，并在返回调用者之前被调用。参数就是那些传递给类构造表达式的值。如果基类有`__init__()`方法，推断类的`__init__()`方法，如果有，必须显示的调用它来确保新实例中基类的部分被正确的初始化；比如：`BaseClass.__init__(self, [args...])`。
 
-        因为`__new__()`和`__init__()`在构建对象的时候共同工作（`__new__()`创建对象，`__init__()定制对象`），`__init__()`不会返回任何值；这样做会在运行时导致`TypeError`异常。
+    因为`__new__()`和`__init__()`在构建对象的时候共同工作（`__new__()`创建对象，`__init__()定制对象`），`__init__()`不会返回任何值；这样做会在运行时导致`TypeError`异常。
     
-    * object.\_\_del\_\_(self)  
+* object.\_\_del\_\_(self)  
     当实例要被销毁的时候被调用。这个方法也可以被叫做销毁器。如果基类有`__del__()`方法，推断类里是否有`__del__()`方法，如果有，必须显式调用这个函数确保实例中基类部分被正确的销毁。注意：在`__del__()`里可以创建本对象的新引用来达到推迟删除的目的，但这并不是推荐做法。`__del__()`方法在删除最后一个引用后不久调用。但不能保证，在解释器退出时所有存活对象的`__del__()`方法都能被调用。  
     
-        ```
-        Note：`del x`并不直接调用`x.__del__()`——— 前者将引用计数减一，而后者只有在引用计数减到零时才被调用。引用计数无法达到零的一些常见情况有：对象之间的循环引用 （例如，一个双链表或一个具有父子指针的树状数据结构)；对出现异常的函式的栈桢上对象的引用`(sys.ext_info()[2]`中的回溯对象保证了栈桢不会被删除）；或者交互模式下出现未拦截异常的栈桢上的对象的引用（`sys.last_traceback`中的回溯对象保证了栈桢不会被删除）。第一种情况只有能通过地打破循环才能解决。后两种情况，可以通过将 `sys.last_traceback`赋予`None`解决。只有在打开循环检查器选项时（这是默认的），循环引用才能被垃圾回收机制发现，但前提是Python脚本中的`__del__()`方法不要参与进来。关于`__del__()`与循环检查器是如何相互影响的详细信息，可以参见`gc`模块的介绍，尤其是其中的 garbage 值的描述。
-        ```  
+    ```
+    Note：`del x`并不直接调用`x.__del__()`——— 前者将引用计数减一，而后者只有在引用计数减到零时才被调用。引用计数无法达到零的一些常见情况有：对象之间的循环引用 （例如，一个双链表或一个具有父子指针的树状数据结构)；对出现异常的函式的栈桢上对象的引用`(sys.ext_info()[2]`中的回溯对象保证了栈桢不会被删除）；或者交互模式下出现未拦截异常的栈桢上的对象的引用（`sys.last_traceback`中的回溯对象保证了栈桢不会被删除）。第一种情况只有能通过地打破循环才能解决。后两种情况，可以通过将 `sys.last_traceback`赋予`None`解决。只有在打开循环检查器选项时（这是默认的），循环引用才能被垃圾回收机制发现，但前提是Python脚本中的`__del__()`方法不要参与进来。关于`__del__()`与循环检查器是如何相互影响的详细信息，可以参见`gc`模块的介绍，尤其是其中的 garbage 值的描述。
+    ```  
       
-        ```
-        Warning：因为调用`__del__()`方法时环境的不确定性，它执行时产生的异常会被忽略掉，只是在`sys.stderr`打印警告信息。另外，当因为删除模块而调用`__del__()`方法时（例如，程序退出时），有些`__del__()`所引用的全局名字可能已经删除了，或者正在删除（例如，正在清理`import`关系）。 由于这些原因，`__del__()`方法对外部不变式的要求应该保持最小。从Python1.5开始，Python可以保证以单下划线开始的全局名字一定在其它全局名字之前从该模块中删除，如果没有其它对这种全局名字的引用，这个功能有助于保证导入的模块在调用`__del__()`时还是有效的。
-        ```
+    ```
+    Warning：因为调用`__del__()`方法时环境的不确定性，它执行时产生的异常会被忽略掉，只是在`sys.stderr`打印警告信息。另外，当因为删除模块而调用`__del__()`方法时（例如，程序退出时），有些`__del__()`所引用的全局名字可能已经删除了，或者正在删除（例如，正在清理`import`关系）。 由于这些原因，`__del__()`方法对外部不变式的要求应该保持最小。从Python1.5开始，Python可以保证以单下划线开始的全局名字一定在其它全局名字之前从该模块中删除，如果没有其它对这种全局名字的引用，这个功能有助于保证导入的模块在调用`__del__()`时还是有效的。
+    ```
     
-    * object.\_\_repr\_\_(self)  
+* object.\_\_repr\_\_(self)  
     有内建函数`repr()`调用，来获得一个对象的“正式的”表达字符串。如果可能的话，这个字符串是一个可用的python表达式，可以用来重新创建一个具有相同值的对象。如果不可能，会返回一个格式为`<...有用的描述...>`的字符串。返回值必须是一个字符串对象。如果一个类只定义了`__repr__()`而没有`__str__()`，`__repr__()`会同样用来获得一个这个类的实例的“非正式”表达字符串。
 
-        这个通常用于调试，所以描述字符串的信息丰富性和无歧义性是很重要的.
+    这个通常用于调试，所以描述字符串的信息丰富性和无歧义性是很重要的.
     
-    * object.\_\_str\_\_(self)  
+* object.\_\_str\_\_(self)  
     由`str(object)`调用，也可以由内建函数`format()`和`print()`调用，来得到一个`非正规的`、容易打印的、表示这个对象的字符串。返回值必须是一个字符串对象。  
 
-        这个方法与`object.__repr__()`的不同之处在于，`__str__()`不一定会返回一个可用的python表达式，返回的是更简单易用的表示。  
+    这个方法与`object.__repr__()`的不同之处在于，`__str__()`不一定会返回一个可用的python表达式，返回的是更简单易用的表示。  
         
-        默认的实现是由内建类型`object`定义的：调用`object.__repr__()`。  
+    默认的实现是由内建类型`object`定义的：调用`object.__repr__()`。  
     
-    * object.\_\_bytes\_\_(self)  
-      由函数`bytes()`调用，来得到一个用来表示对像的一个字节字符串。这会返回一个字节对像。
+* object.\_\_bytes\_\_(self)  
+    由函数`bytes()`调用，来得到一个用来表示对像的一个字节字符串。这会返回一个字节对像。
       
-    * object.\_\_format\_\_(self, format_spec)  
-        由内建函数`format()`（和`str`类的方法`format()`）调用，用来构造对象的“格式化”字符串描述。`format_spec`参数是描述格式选项的字符串。`format_spec`的解释依赖于实现`__format__()`的类型，但一般来说，大多数类要么把格式化任务委托（转交）给某个内建类型，或者使用与内建类型类似的格式化选项。
+* object.\_\_format\_\_(self, format_spec)  
+    由内建函数`format()`（和`str`类的方法`format()`）调用，用来构造对象的“格式化”字符串描述。`format_spec`参数是描述格式选项的字符串。`format_spec`的解释依赖于实现`__format__()`的类型，但一般来说，大多数类要么把格式化任务委托（转交）给某个内建类型，或者使用与内建类型类似的格式化选项。
 
-        关于标准格式语法的描述，可以参考`Format Specification Mini-Language`。
+    关于标准格式语法的描述，可以参考`Format Specification Mini-Language`。
 
-        返回值必须是字符串对象。
-        Changed in version 3.4: The __format__ method of object itself raises a TypeError if passed any non-empty string.
-        3.4版发生的变化：如果传递任意的非空字符给`__format__`方法，会产生`TypeError`异常。
+    返回值必须是字符串对象。
+    ```
+    在Python 3.4版发生的变化：
+    如果传递任意的非空字符给`__format__`方法，会产生`TypeError`异常。
+    ```
         
-    * object.\_\_lt\_\_(self, other)  
-      object.\_\_le\_\_(self, other)  
-      object.\_\_eq\_\_(self, other)  
-      object.\_\_ne\_\_(self, other)  
-      object.\_\_gt\_\_(self, other)  
-      object.\_\_ge\_\_(self, other)  
-        它们称为“富比较”方法。运算符与方法名的对应关系如下：`x<y`调用`x.__lt__(y)`，`x<=y`调用`x.__le__(y)`，`x==y`调用`x.__eq__(y)`，`x!=y`调用`x.__ne__(y)`，`x>y`调用`x.__gt__(y)`，`x>=y`调用`x.__ge__(y)`。  
+* object.\_\_lt\_\_(self, other)  
+  object.\_\_le\_\_(self, other)  
+  object.\_\_eq\_\_(self, other)  
+  object.\_\_ne\_\_(self, other)  
+  object.\_\_gt\_\_(self, other)  
+  object.\_\_ge\_\_(self, other)  
+    它们称为“富比较”方法。运算符与方法名的对应关系如下：`x<y`调用`x.__lt__(y)`，`x<=y`调用`x.__le__(y)`，`x==y`调用`x.__eq__(y)`，`x!=y`调用`x.__ne__(y)`，`x>y`调用`x.__gt__(y)`，`x>=y`调用`x.__ge__(y)`。  
         
-        不是所有厚比较方法都要同时实现的，如果个别厚比较方法没有实现，可以直接返回 NotImplemented。从习惯上讲，一次成功的比较应该返回`False`或`True`。但是这些方法也可以返回任何值，所以如果比较运算发生在布尔上下文中（例如`if`语句中的条件测试），Python会在返回值上调用函式`bool()`确定返回值的真值。
+    不是所有厚比较方法都要同时实现的，如果个别厚比较方法没有实现，可以直接返回 NotImplemented。从习惯上讲，一次成功的比较应该返回`False`或`True`。但是这些方法也可以返回任何值，所以如果比较运算发生在布尔上下文中（例如`if`语句中的条件测试），Python会在返回值上调用函式`bool()`确定返回值的真值。
 
-        在比较运算符之间并没有潜在的相互关系。`x==y`为真并不意味着`x!=y`为假。因此，如果定义了方法`__eq__()`，那么也应该定义`__ne__()`，这样才可以得到期望的效果。关于如何创建可以作为字典键使用的`hashable`对象，还需要参考`__hash__()`的介绍。  
+    在比较运算符之间并没有潜在的相互关系。`x==y`为真并不意味着`x!=y`为假。因此，如果定义了方法`__eq__()`，那么也应该定义`__ne__()`，这样才可以得到期望的效果。关于如何创建可以作为字典键使用的`hashable`对象，还需要参考`__hash__()`的介绍。  
 
-        没有参数交换版本的方法定义（这可以用于当左边参数不支持操作，但右边参数支持的情况）。`__lt__()`和`__gt__()`相互反射（即互为参数交换版本）；`__le__()`和`__ge__()`相互反射；`__eq__()`和`__ne__()`相互反射。  
+    没有参数交换版本的方法定义（这可以用于当左边参数不支持操作，但右边参数支持的情况）。`__lt__()`和`__gt__()`相互反射（即互为参数交换版本）；`__le__()`和`__ge__()`相互反射；`__eq__()`和`__ne__()`相互反射。  
 
-        传递给厚比较方法的参数不能是被自动强制类型转换的（coerced）。  
+    传递给厚比较方法的参数不能是被自动强制类型转换的（coerced）。  
 
-        关于如何从一个根操作自动生成顺序判定操作，可以参考 `functools.total_ordering()`。  
+    关于如何从一个根操作自动生成顺序判定操作，可以参考 `functools.total_ordering()`。  
 
-    * object.\_\_hash\_\_(self)  
-        由内建函式`hash()`，或者是在可散列集合（`hashed collections`，包括 set，frozenset，dict）成员上的操作调用。这个方法应该返回一个整数。只有一个要求，具有相同值的对象应该有相同的散列值。应该考虑以某种方式（例如排斥或）把在对象比较中起作用的部分与散列值关联起来。  
+* object.\_\_hash\_\_(self)  
+    由内建函式`hash()`，或者是在可散列集合（`hashed collections`，包括 set，frozenset，dict）成员上的操作调用。这个方法应该返回一个整数。只有一个要求，具有相同值的对象应该有相同的散列值。应该考虑以某种方式（例如排斥或）把在对象比较中起作用的部分与散列值关联起来。  
 
-        如果类没有定义`__eq__()`方法，那么它也不应该定义`__hash__()`方法；如果一个类只定义了`__eq__()`方法，那么它是不适合作散列键的。如果可变对象实现了`__eq__()`方法，它也不应该实现`__hash__()`方法，因为可散列集合要求键值是不可变的(如果对象的散列值发生了改变，它会被放在错误的桶（bucket）中）。  
+    如果类没有定义`__eq__()`方法，那么它也不应该定义`__hash__()`方法；如果一个类只定义了`__eq__()`方法，那么它是不适合作散列键的。如果可变对象实现了`__eq__()`方法，它也不应该实现`__hash__()`方法，因为可散列集合要求键值是不可变的(如果对象的散列值发生了改变，它会被放在错误的桶（bucket）中）。  
 
-        所有用户定义类默认都定义了方法`__eq__()`和`__hash__()`，这样，所有对象都可以进行相等比较（除了与自身比较）。`x.__hash__()`返回`id(x)`。
+    所有用户定义类默认都定义了方法`__eq__()`和`__hash__()`，这样，所有对象都可以进行相等比较（除了与自身比较）。`x.__hash__()`返回`id(x)`。
 
-        如果子类从父类继承了方法`__hash__()`，但修改了`__eq__()`，这时子类继承的散列值就不再正确了（例如，可能从默认的标识相等的比较切换成了值相等的比较），这时在在类定义时显式地将`__hash__()`设置成`None`就行了。这样，在使用这个子类对象作为散列键时就会抛出`TypeError`异常，或者也可以使用常规的可散列检查`isinstance(obj, collections.Hashable)`确定它的不可散列性（使用这种检查方式时，这种达到不可散列的方法与在`__hash__()`中显式抛出异常的方法是的计算结果就不一样了）。
+    如果子类从父类继承了方法`__hash__()`，但修改了`__eq__()`，这时子类继承的散列值就不再正确了（例如，可能从默认的标识相等的比较切换成了值相等的比较），这时在在类定义时显式地将`__hash__()`设置成`None`就行了。这样，在使用这个子类对象作为散列键时就会抛出`TypeError`异常，或者也可以使用常规的可散列检查`isinstance(obj, collections.Hashable)`确定它的不可散列性（使用这种检查方式时，这种达到不可散列的方法与在`__hash__()`中显式抛出异常的方法是的计算结果就不一样了）。
 
-        如果子类修改了`__eq__()`方法，但需要保留父类的`__hash__()`，它必须显式地告诉解释器`__hash__ = <ParentClass>.__hash__`，否则`__hash__()`的继承会被阻止，就像设置`__hash__`为`None`。
+    如果子类修改了`__eq__()`方法，但需要保留父类的`__hash__()`，它必须显式地告诉解释器`__hash__ = <ParentClass>.__hash__`，否则`__hash__()`的继承会被阻止，就像设置`__hash__`为`None`。
 
-    * object.\_\_bool\_\_(self)  
-        在实现真值测试和内建操作`bool()`中调用，应该返回`False`和`True`。如果没有这个定义方法，转而使用`__len__()`。非零返回值，当作“真”。如果这两个方法都没有定义，就认为该实例为“真”。
+* object.\_\_bool\_\_(self)  
+    在实现真值测试和内建操作`bool()`中调用，应该返回`False`和`True`。如果没有这个定义方法，转而使用`__len__()`。非零返回值，当作“真”。如果这两个方法都没有定义，就认为该实例为“真”。
         
-* 3.2 定制访问属性  
-    以下方法可以用于定制访问类实例属性的含义（例如，赋值，或删除`x.name`）
-    * object.\_\_getattr\_\_(self, name)  
-        在正常方式访问属性无法成功时（就是说，self属性既不是实例的，在类树结构中找不到）使用。`name`是属性名。应该返回一个计算好的属性值，或抛出一个`AttributeError`异常。
+#### 3.2 定制访问属性  
+以下方法可以用于定制访问类实例属性的含义（例如，赋值，或删除`x.name`）
 
-        注意，如果属性可以通过正常方法访问，`__getattr__()`是不会被调用的（是有意将`__getattr__()`和`__setattr__()`设计成不对称的）。这样做的原因是基于效率的考虑，并且这样也不会让`__getattr__()`干涉正常属性。注意，至少对于类实例而言，不必非要更新实例字典伪装属性（但可以将它们插入到其它对象中）。需要全面控制属性访问，可以参考以下`__getattribute__()`的介绍。
-        
-    * object.\_\_getattribute\_\_(self, name)  
-        在访问类实例的属性时无条件调用这个方法。如果类也定义了方法 `__getattr__()`，那么除非`__getattribute__()`显式地调用了它，或者抛出了`AttributeError`异常，否则它就不会被调用。这个方法应该返回一个计算好的属性值，或者抛出异常`AttributeError`。为了避免无穷递归，对于任何它需要访问的属性，这个方法应该调用基类的同名方法，例如，`object.__getattribute__(self, name)`。  
-        
-        ```
-        Note：但是，通过特定语法或者内建函式，做隐式调用搜索特殊方法时，这个方法可能会被跳过。参见 搜索特殊方法。
-        ```
-        
-    * object.\_\_setattr\_\_(self, name, value)  
-        在属性要被赋值时调用。这会替代正常机制（即把值保存在实例字典中）。`name`是属性名，`vaule`是要赋的值。
+* object.\_\_getattr\_\_(self, name)  
+    在正常方式访问属性无法成功时（就是说，self属性既不是实例的，在类树结构中找不到）使用。`name`是属性名。应该返回一个计算好的属性值，或抛出一个`AttributeError`异常。
 
-        如果在`__setattr__()`里要对一个实例属性赋值，它应该调用父类的同名方法，例如，`object.__setattr__(self, name, value)`。
-    * object.\_\_delattr\_\_(self, name)  
-        与`__setattr__()`类似，但它的功能是删除属性。当`del obj.name`对对象有意义时，才需要实现它。
-    * object.\_\_dir\_\_(self)  
-        在对象上调用`dir()`时调用，它需要返回一个序列。`dir()`会将返回的序列转成一个列表，并进行排序。
+    注意，如果属性可以通过正常方法访问，`__getattr__()`是不会被调用的（是有意将`__getattr__()`和`__setattr__()`设计成不对称的）。这样做的原因是基于效率的考虑，并且这样也不会让`__getattr__()`干涉正常属性。注意，至少对于类实例而言，不必非要更新实例字典伪装属性（但可以将它们插入到其它对象中）。需要全面控制属性访问，可以参考以下`__getattribute__()`的介绍。
         
-* 3.2.1 实现描述
-    * object.\_\_get\_\_(self, instance, owner)
-    * object.\_\_set\_\_(self, instance, value)
-    * object.\_\_delete\_\_(self, instance)
-* 3.2.2 使用描述
-* 3.2.3 \_\_slots\_\_
-* 3.2.3.1 使用\_\_slots\_\_的注意事项
+* object.\_\_getattribute\_\_(self, name)  
+    在访问类实例的属性时无条件调用这个方法。如果类也定义了方法 `__getattr__()`，那么除非`__getattribute__()`显式地调用了它，或者抛出了`AttributeError`异常，否则它就不会被调用。这个方法应该返回一个计算好的属性值，或者抛出异常`AttributeError`。为了避免无穷递归，对于任何它需要访问的属性，这个方法应该调用基类的同名方法，例如，`object.__getattribute__(self, name)`。  
+        
+    ```
+    Note：但是，通过特定语法或者内建函式，做隐式调用搜索特殊方法时，这个方法可能会被跳过。参见 搜索特殊方法。
+    ```
+        
+* object.\_\_setattr\_\_(self, name, value)  
+    在属性要被赋值时调用。这会替代正常机制（即把值保存在实例字典中）。`name`是属性名，`vaule`是要赋的值。
 
-* 3.3 定制类的生成  
+    如果在`__setattr__()`里要对一个实例属性赋值，它应该调用父类的同名方法，例如，`object.__setattr__(self, name, value)`。
+    
+* object.\_\_delattr\_\_(self, name)  
+    与`__setattr__()`类似，但它的功能是删除属性。当`del obj.name`对对象有意义时，才需要实现它。
+    
+* object.\_\_dir\_\_(self)  
+    在对象上调用`dir()`时调用，它需要返回一个序列。`dir()`会将返回的序列转成一个列表，并进行排序。
+        
+##### 3.2.1 实现描述符  
+
+含有所有者类`owner class`中的方法的类被叫做描述符类，下边的方法只会出现在描述符类的实例中。描述符要么在所有者的类字典中，或者在他们父类的类字典中。在下面的例子里，“属性”指名字出现在所有者类`__dict__`中的属性。
+
+* object.\_\_get\_\_(self, instance, owner)
+    调用这个方法可以获得所有者类中的属性（获取类属性）也可以获取类的实例的属性（获取实例属性）。`owner`是所有者类，当`instance`是`None`时从`owner`中获取属性，当`instance`是一个实例时从`instance`中获取属性。这个方法应该返回属性值，或者产生`AttributeError`异常。
+        
+* object.\_\_set\_\_(self, instance, value)  
+    调用这个方法可以为所有者类的实例`instance`的属性设置新值`value`。
+        
+* object.\_\_delete\_\_(self, instance)  
+    调用这个方法来删除所有者类实例`instance`中的属性。
+        
+##### 3.2.2 使用描述
+##### 3.2.3 \_\_slots\_\_
+###### 3.2.3.1 使用\_\_slots\_\_的注意事项
+
+#### 3.3 定制类的生成  
 默认情况下，类是由`type()`来构建的。类的实体是在新的名字空间中执行，而且类的名字是与`type(name, bases, namespace)`的结果绑定的。  
 类的创建过程可以通过在类声明的时候指定`metaclass`定制，也可以通过继承已有的、包含这个参数的类来实现。在下边的例子中`MyClass`和`MySubclass`都是`Meta`的实例：  
 
-    ```  
-    class Meta(type):
-        pass
+```  
+class Meta(type):
+    pass
 
-    class MyClass(metaclass=Meta):
-        pass
+class MyClass(metaclass=Meta):
+    pass
 
-    class MySubclass(MyClass):
-        pass  
-    ```
+class MySubclass(MyClass):
+    pass  
+```
+
 其他在类定义中使用到的关键字变量，都会被传递到下边描述的所有的`metaclass`操作中。  
 当一个类定义执行时，会执行如下操作：  
 
-    ```
-        * 选择合适的metaclass  
-        * 准备类的名字空间  
-        * 执行类的内容（body）  
-        * 创建类对象  
-    ```
+
+* 选择合适的metaclass  
+* 准备类的名字空间  
+* 执行类的内容（body）  
+* 创建类对象  
+
     
-    * 3.3.1 选择合适的`Metaclass`  
-        下面定义了什么样的的`metaclass`对于一个类定义来说是合适的  
+##### 3.3.1 选择合适的`Metaclass`  
+
+下面定义了什么样的的`metaclass`对于一个类定义来说是合适的  
        
-          * 如果没有定义基类，也没有特别指定`metaclass`，那么就使用`type()`  
-          * 如果给定一个`metaclass`，而且它不是`type()`的实例，那么它就被直接用作`metaclass`  
-          * 如果给定一个`type()`的实例作为`metaclass`，或者定义了基类, 那就使用最底层的`metaclass`  
+* 如果没有定义基类，也没有特别指定`metaclass`，那么就使用`type()`  
+* 如果给定一个`metaclass`，而且它不是`type()`的实例，那么它就被直接用作`metaclass`  
+* 如果给定一个`type()`的实例作为`metaclass`，或者定义了基类, 那就使用最底层的`metaclass`  
 
-         底层`metaclass`是从给定的`metaclass`和所有基类的metaclass中选出的。底层`metaclass`是所有候选`metaclass`的子类型。如果候选`metaclass`中没有一个满足条件，那么类定义就会失败，并抛出`TypeError`异常。
+底层`metaclass`是从给定的`metaclass`和所有基类的metaclass中选出的。底层`metaclass`是所有候选`metaclass`的子类型。如果候选`metaclass`中没有一个满足条件，那么类定义就会失败，并抛出`TypeError`异常。
 
-    * 3.3.2 准备类的名字空间  
-        一旦合适的`metaclass`被确认后，类的名字空间就准备好了。如果`metaclass`有`__prepare__`属性，就执行`namespace = metaclass.__prepare__(name, bases, **kwds)`(其中的关键字参数，是来自类定义里的)。
+##### 3.3.2 准备类的名字空间  
+
+一旦合适的`metaclass`被确认后，类的名字空间就准备好了。如果`metaclass`有`__prepare__`属性，就执行`namespace = metaclass.__prepare__(name, bases, **kwds)`(其中的关键字参数，是来自类定义里的)。
         
-        如果`metaclass`没有`__prepare__`属性，那么类的名字空间就被初始化为一个空的字典实例。
-         ```
-         See also
-         PEP 3115 - Metaclasses in Python 3000
-         Introduced the __prepare__ namespace hook
-         ```
+如果`metaclass`没有`__prepare__`属性，那么类的名字空间就被初始化为一个空的字典实例。
+
+```
+See also
+PEP 3115 - Metaclasses in Python 3000
+Introduced the __prepare__ namespace hook
+```
          
-    * 3.3.3 执行类的内容（body）  
-        类的`body`是以类似`exec(body, globals(), namespace)`的方式执行的。与普通调用`exec()`的主要区别在于，当类定义发生在一个函数内部时，词法作用域允许类的`body`（包括任何的函数）引用任何当前或者外部作用域的名称。
+##### 3.3.3 执行类的内容（body）  
 
-        尽管里的定义发生在`exec`函数里，但是类中定义的方法仍然无法看到类中的其它名字。如果要使用类的变量必须通过实例或类方法的第一个参数，而且不能被静态静态方法使用。
+类的`body`是以类似`exec(body, globals(), namespace)`的方式执行的。与普通调用`exec()`的主要区别在于，当类定义发生在一个函数内部时，词法作用域允许类的`body`（包括任何的函数）引用任何当前或者外部作用域的名称。
+
+尽管里的定义发生在`exec`函数里，但是类中定义的方法仍然无法看到类中的其它名字。如果要使用类的变量必须通过实例或类方法的第一个参数，而且不能被静态静态方法使用。
     
-    * 3.3.4 创建类对象  
-        当类的内容被执行，并构成了类的名字空间后，类对象就通过调用`metaclass(name, bases, namespace, **kwds)`创建好了(传递到这里的关键字变量与传递到`__prepare__`中的一样)。
+##### 3.3.4 创建类对象  
 
-        一个类对象的引用保存在不含参的`super().__class__`里，它是一个由编译器创建的隐藏的闭包，任何类`body`中的方法都可以被`__class__`或者`super`引用。这样的话，如果当前的调用需要使用传递到方法中的第一个参数来识别类或对象时，执行调用的类或者实例这样无参的`super()`就可以正确的识别那些在词法作用域定义的类。
-        
-        当类对象被创建后，它被传递给类中的的装饰器，作为结果的类对象会被绑定在本地名字空间中作为定义好的类。
-        
-        当一个新的类通过`type.__new__`被创建，新的类对象将名字空间参数复制到一个标准的Python字典中，然后将原始的类对象抛弃。新复制的字典成为类对象的`__dict__`属性。
-        
-    * 3.3.5 `Metaclass`实例  
-      `metaclass`的可能使用方式是无限的。有些方法已经被验证过了比如，日志、接口检查、自动授权、自动创建参数、代理、框架、自动资源锁／同步。  
+当类的内容被执行，并构成了类的名字空间后，类对象就通过调用`metaclass(name, bases, namespace, **kwds)`创建好了(传递到这里的关键字变量与传递到`__prepare__`中的一样)。
 
-        这里给出一个`metaclass`的例子，使用`collections.OrderedDict`来记录类中的变量被创建的顺序。  
+一个类对象的引用保存在不含参的`super().__class__`里，它是一个由编译器创建的隐藏的闭包，任何类`body`中的方法都可以被`__class__`或者`super`引用。这样的话，如果当前的调用需要使用传递到方法中的第一个参数来识别类或对象时，执行调用的类或者实例这样无参的`super()`就可以正确的识别那些在词法作用域定义的类。
+        
+当类对象被创建后，它被传递给类中的的装饰器，作为结果的类对象会被绑定在本地名字空间中作为定义好的类。
+        
+当一个新的类通过`type.__new__`被创建，新的类对象将名字空间参数复制到一个标准的Python字典中，然后将原始的类对象抛弃。新复制的字典成为类对象的`__dict__`属性。
+        
+##### 3.3.5 `Metaclass`实例  
+`metaclass`的可能使用方式是无限的。有些方法已经被验证过了比如，日志、接口检查、自动授权、自动创建参数、代理、框架、自动资源锁／同步。  
+
+这里给出一个`metaclass`的例子，使用`collections.OrderedDict`来记录类中的变量被创建的顺序。  
     
-        ```
-        class OrderedClass(type):  
-            @classmethod  
-            def __prepare__(metacls, name, bases, **kwds):  
-                return collections.OrderedDict()  
+```
+class OrderedClass(type):  
+    @classmethod  
+    def __prepare__(metacls, name, bases, **kwds):  
+        return collections.OrderedDict()  
 
-            def __new__(cls, name, bases, namespace, **kwds):  
-                result = type.__new__(cls, name, bases, dict(namespace))  
-                result.members = tuple(namespace)  
-                return result  
+    def __new__(cls, name, bases, namespace, **kwds):  
+        result = type.__new__(cls, name, bases, dict(namespace))  
+        result.members = tuple(namespace)  
+        return result  
 
-        class A(metaclass=OrderedClass):  
-            def one(self): pass  
-            def two(self): pass  
-            def three(self): pass  
-            def four(self): pass  
+class A(metaclass=OrderedClass):  
+    def one(self): pass  
+    def two(self): pass  
+    def three(self): pass  
+    def four(self): pass  
 
-        >>> A.members  
-        ('__module__', 'one', 'two', 'three', 'four')  
-        ```  
+>>> A.members  
+('__module__', 'one', 'two', 'three', 'four')  
+```  
     
-        当执行`A`的类定义时，首先执行`metaclass`的`__prepare__()`方法，这个方法返回一个空的`collections.OrderedDict`。这个字典会记录类`A`中定义的方法和属性。当这些定义执行完，这个有序字段就成为类的一部分，然后`__new__()`开始被调用。这个方法会创建新的`type`类型，将有序字典的`key`保存到这个类型的属性`memebers`中。  
+当执行`A`的类定义时，首先执行`metaclass`的`__prepare__()`方法，这个方法返回一个空的`collections.OrderedDict`。这个字典会记录类`A`中定义的方法和属性。当这些定义执行完，这个有序字段就成为类的一部分，然后`__new__()`开始被调用。这个方法会创建新的`type`类型，将有序字典的`key`保存到这个类型的属性`memebers`中。  
 
-* 3.4 定制实例和子类的检查  
-    以下函数可以用于定制内建函式`isinstance()`和`issubclass()`的默认行为。  
+#### 3.4 定制实例和子类的检查  
+以下函数可以用于定制内建函式`isinstance()`和`issubclass()`的默认行为。  
 
-    具体地，元类`abc.ABCMeta`实现了这些方法，以允许把抽象基类（ABC）作为任何类或者类型（包括内建类型），也包括其他ABC的“虚拟基类”。
+具体地，元类`abc.ABCMeta`实现了这些方法，以允许把抽象基类（ABC）作为任何类或者类型（包括内建类型），也包括其他ABC的“虚拟基类”。
 
-    * class.\_\_instancecheck\_\_(self, instance)  
-        如果`instance`应该被看作`class`的一个直接或者间接的实例，就返回真。如果定义了这个方法, 它就会被用于实现`isinstance(instance, class)`。
-    * class.\_\_subclasscheck\_\_(self, subclass)  
-        如果`subclass`应该被看作是`class`的一个直接或者间接的基类，就返回真。如果定义了这个方法，它就会被用于实现`issubclass(subclass, class)`。
+* class.\_\_instancecheck\_\_(self, instance)  
+    如果`instance`应该被看作`class`的一个直接或者间接的实例，就返回真。如果定义了这个方法, 它就会被用于实现`isinstance(instance, class)`。
+* class.\_\_subclasscheck\_\_(self, subclass)  
+    如果`subclass`应该被看作是`class`的一个直接或者间接的基类，就返回真。如果定义了这个方法，它就会被用于实现`issubclass(subclass, class)`。
 
-    注意，这个方法会在一个类的类型（元类）中查找。它们不能作为一个类方法在类中定义。这个机制，与在实例上查找要调用的特殊方法的机制是一致的，因为在这个情况下实例本身就是一个类。
+注意，这个方法会在一个类的类型（元类）中查找。它们不能作为一个类方法在类中定义。这个机制，与在实例上查找要调用的特殊方法的机制是一致的，因为在这个情况下实例本身就是一个类。
         
-    ```
-    See also:
-    PEP 3119 - Introducing Abstract Base Classes　 (抽象基类介绍)
-    包括定制通过 __instancecheck__() 和 __subclasscheck__()　定制 isinstance() 和 issubclass() 行为的规范，以及在语言上增加抽象基类 (见 abc 模块) 这个背景设置这个功能的动机。
-    ```
+```
+See also:
+PEP 3119 - Introducing Abstract Base Classes　 (抽象基类介绍)
+包括定制通过 __instancecheck__() 和 __subclasscheck__()　定制 isinstance() 和 issubclass() 行为的规范，以及在语言上增加抽象基类 (见 abc 模块) 这个背景设置这个功能的动机。
+```
 
-* 3.5 模拟可调用对象
+#### 3.5 模拟可调用对象
     * object.\_\_call\_\_(self[, args...])  
     当实例作为函式使用时调用本方法。如果定义了这个方法，`x(arg1, arg2,...)`就相当于`x.__call__(arg1, arg2,...)`。
 
-* 3.6 模拟容器类型
-    * object.\_\_len\_\_(self)  
-    * object.\_\_length_hint\_\_(self)  
-    * object.\_\_getitem\_\_(self, key)  
-    * object.\_\_missing\_\_(self, key)  
-    * object.\_\_setitem\_\_(self, key, value)  
-    * object.\_\_delitem\_\_(self, key)  
-    * object.\_\_iter\_\_(self)  
-    * object.\_\_reversed\_\_(self)  
-    * object.\_\_contains\_\_(self, item)
+#### 3.6 模拟容器类型
+* object.\_\_len\_\_(self)  
+* object.\_\_length_hint\_\_(self)  
+* object.\_\_getitem\_\_(self, key)  
+* object.\_\_missing\_\_(self, key)  
+* object.\_\_setitem\_\_(self, key, value)  
+* object.\_\_delitem\_\_(self, key)  
+* object.\_\_iter\_\_(self)  
+* object.\_\_reversed\_\_(self)  
+* object.\_\_contains\_\_(self, item)
 
-* 3.7 模拟数字类型
-    * object.\_\_add\_\_(self, other)  
+#### 3.7 模拟数字类型
+* object.\_\_add\_\_(self, other)  
 object.\_\_sub\_\_(self, other)  
 object.\_\_mul\_\_(self, other)  
 object.\_\_matmul\_\_(self, other)  
@@ -536,7 +556,7 @@ object.\_\_and\_\_(self, other)
 object.\_\_xor\_\_(self, other)  
 object.\_\_or\_\_(self, other)  
 
-    * object.\_\_radd\_\_(self, other)  
+* object.\_\_radd\_\_(self, other)  
 object.\_\_rsub\_\_(self, other)  
 object.\_\_rmul\_\_(self, other)  
 object.\_\_rmatmul\_\_(self, other)  
@@ -551,7 +571,7 @@ object.\_\_rand\_\_(self, other)
 object.\_\_rxor\_\_(self, other)  
 object.\_\_ror\_\_(self, other)  
 
-    * object.\_\_iadd\_\_(self, other)  
+* object.\_\_iadd\_\_(self, other)  
 object.\_\_isub\_\_(self, other)  
 object.\_\_imul\_\_(self, other)  
 object.\_\_imatmul\_\_(self, other)  
@@ -565,105 +585,232 @@ object.\_\_iand\_\_(self, other)
 object.\_\_ixor\_\_(self, other)  
 object.\_\_ior\_\_(self, other)  
 
-    * object.\_\_neg\_\_(self)  
+* object.\_\_neg\_\_(self)  
 object.\_\_pos\_\_(self)  
 object.\_\_abs\_\_(self)  
 object.\_\_invert\_\_(self)  
 
-    * object.\_\_complex\_\_(self)  
+* object.\_\_complex\_\_(self)  
 object.\_\_int\_\_(self)  
 object.\_\_float\_\_(self)  
 object.\_\_round\_\_(self[, n])  
 
-    * object.\_\_index\_\_(self)
+* object.\_\_index\_\_(self)
 
-* 3.8 With语句和上下文管理器  
-    上下文管理器`context manager`是一个对象，这个对象定义了执行`with`语句时要建立的运行时上下文。上下文管理器负责处理执行某代码块时对应的运行时上下文进入和退出。运行时上下文的使用一般通过`with`语句（参见`with`语句），但也可以直接调用它的方法。  
+#### 3.8 With语句和上下文管理器  
+上下文管理器`context manager`是一个对象，这个对象定义了执行`with`语句时要建立的运行时上下文。上下文管理器负责处理执行某代码块时对应的运行时上下文进入和退出。运行时上下文的使用一般通过`with`语句（参见`with`语句），但也可以直接调用它的方法。  
 
-    上下文管理器的典型用途包括保存和恢复各种全局状态，锁定和解锁资源，关闭打开的文件等等。  
+上下文管理器的典型用途包括保存和恢复各种全局状态，锁定和解锁资源，关闭打开的文件等等。  
 
-    关于上下文管理的更多信息，可以参考 Context Manager Types。  
+关于上下文管理的更多信息，可以参考 Context Manager Types。  
     
-    * object.\_\_enter\_\_(self)  
-        进入与这个对象关联的运行时上下文。`with`语句会把这个方法的返回值与`as`子句指定的目标绑定在一起 (如果指定了的话)。
+* object.\_\_enter\_\_(self)  
+    进入与这个对象关联的运行时上下文。`with`语句会把这个方法的返回值与`as`子句指定的目标绑定在一起 (如果指定了的话)。
         
-    * object.\_\_exit\_\_(self, exc_type, exc_value, traceback)  
-        退出与这个对象相关的运行时上下文。参数描述了导致上下文退出的异常，如果是无异常退出，则这三个参数都为`None`。  
+* object.\_\_exit\_\_(self, exc_type, exc_value, traceback)  
+    退出与这个对象相关的运行时上下文。参数描述了导致上下文退出的异常，如果是无异常退出，则这三个参数都为`None`。  
         
-        如果给出了一个异常，而这个方法决定要压制它（即防止它把传播出去），那么它应该返回真。否则，在退出这个方法时，这个异常会按正常方式处理。
+    如果给出了一个异常，而这个方法决定要压制它（即防止它把传播出去），那么它应该返回真。否则，在退出这个方法时，这个异常会按正常方式处理。
 
-        注意方法`__exit__()`不应该把传入的异常重新抛出，这是调用者的责任。
+    注意方法`__exit__()`不应该把传入的异常重新抛出，这是调用者的责任。
         
-        ```
-        See also
-            PEP 0343 - The “with” statement（“with” 语句）
-            Python with 语句的规范，背景和例子。
-        ```
+```
+See also
+PEP 0343 - The “with” statement（“with” 语句）
+Python with 语句的规范，背景和例子。
+```
 
-* 3.9 搜索特殊方法  
-    对于定制类，只有在对象类型的字典里定义好，才能保证成功调用特殊方法。这是以下代码发生异常的原因：
+#### 3.9 搜索特殊方法  
+对于定制类，只有在对象类型的字典里定义好，才能保证成功调用特殊方法。这是以下代码发生异常的原因：
     
-    ```
-    >>> class C:
-    ...     pass
-    ...
-    >>> c = C()
-    >>> c.__len__ = lambda: 5
-    >>> len(c)
-    Traceback (most recent call last):
-      File "<stdin>", line 1, in <module>
-    TypeError: object of type 'C' has no len()
-    ```
+```
+>>> class C:
+...     pass
+...
+>>> c = C()
+>>> c.__len__ = lambda: 5
+>>> len(c)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+TypeError: object of type 'C' has no len()
+```
     
-    这个行为的原因在于，有不少特殊方法在所有对象中都得到了实现，例如`__hash__()`和`__repr__()`。如果按照常规的搜索过程搜索这些方法，在涉及到类型对象时就会出错。  
+这个行为的原因在于，有不少特殊方法在所有对象中都得到了实现，例如`__hash__()`和`__repr__()`。如果按照常规的搜索过程搜索这些方法，在涉及到类型对象时就会出错。  
     
-    ```
-    >>> 1.__hash__() == hash(1)
-    True
-    >>> int.__hash__() == hash(int)
-    Traceback (most recent call last):
-      File "<stdin>", line 1, in <module>
-    TypeError: descriptor '__hash__' of 'int' object needs an argument
-    ```
+```
+>>> 1.__hash__() == hash(1)
+True
+>>> int.__hash__() == hash(int)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+TypeError: descriptor '__hash__' of 'int' object needs an argument
+```
     
-    试图以这种错误方式调用一个类的未绑定方法有时叫作`metaclass confusion`，可以通过在搜索特殊方法时跳过实例避免：
+试图以这种错误方式调用一个类的未绑定方法有时叫作`metaclass confusion`，可以通过在搜索特殊方法时跳过实例避免：
     
-    ```
-    >>> type(1).__hash__(1) == hash(1)
-    True
-    >>> type(int).__hash__(int) == hash(int)
-    True
-    ```
+```
+>>> type(1).__hash__(1) == hash(1)
+True
+>>> type(int).__hash__(int) == hash(int)
+True
+```
     
-    除了因为正确性的原因而跳过实例属性之外，特殊方法搜索也会跳过`__getattribute__()`方法，甚至是元类中的：
+除了因为正确性的原因而跳过实例属性之外，特殊方法搜索也会跳过`__getattribute__()`方法，甚至是元类中的：
     
-    ```
-    >>> class Meta(type):
-    ...    def __getattribute__(*args):
-    ...       print("Metaclass getattribute invoked")
-    ...       return type.__getattribute__(*args)
-    ...
-    >>> class C(object, metaclass=Meta):
-    ...     def __len__(self):
-    ...         return 10
-    ...     def __getattribute__(*args):
-    ...         print("Class getattribute invoked")
-    ...         return object.__getattribute__(*args)
-    ...
-    >>> c = C()
-    >>> c.__len__()                 # Explicit lookup via instance
-    Class getattribute invoked
-    10
-    >>> type(c).__len__(c)          # Explicit lookup via type
-    Metaclass getattribute invoked
-    10
-    >>> len(c)                      # Implicit lookup
-    10
-    ```
+```
+>>> class Meta(type):
+...    def __getattribute__(*args):
+...       print("Metaclass getattribute invoked")
+...       return type.__getattribute__(*args)
+...
+>>> class C(object, metaclass=Meta):
+...     def __len__(self):
+...         return 10
+...     def __getattribute__(*args):
+...         print("Class getattribute invoked")
+...         return object.__getattribute__(*args)
+...
+>>> c = C()
+>>> c.__len__()                 # Explicit lookup via instance
+Class getattribute invoked
+10
+>>> type(c).__len__(c)          # Explicit lookup via type
+Metaclass getattribute invoked
+10
+>>> len(c)                      # Implicit lookup
+10
+```
     
-    这种跳过`__getattribute__()`的机制为解释器的时间性能优化提供了充分的余地，代价是牺牲了处理特殊方法时的部分灵活性（为了保持与解释器的一致，特殊方法必须在类对象中定义）。
+这种跳过`__getattribute__()`的机制为解释器的时间性能优化提供了充分的余地，代价是牺牲了处理特殊方法时的部分灵活性（为了保持与解释器的一致，特殊方法必须在类对象中定义）。
     
 # 4. Coroutines
+
+###### 4.1. 可等待对象
+一个可等待对象一般会实现方法`__await__()`。由`async def`函数返回的`coroutine`对象都是可等待的。  
+								
+```
+注意：被`types.coroutine()`或者`asyncio.coroutine()`修饰的，由生成器创建的迭代器对象也是可等待的。但是它并没有实现`__await__()`
+```
+
+* object.__await__(self)  
+    必须返回一个迭代器。用来实现可等待对象。对于实例，`asyncio.Future`实现了这个方法，来兼容等待表达式。  
+    
+在Python 3.5版中中新增。  
+    
+    ```
+    See also PEP 492 for additional information about awaitable objects.
+    ```
+    
+###### 4.2. 协程对象
+
+协程对象都是可等待对象。一个协程的执行是可以通过`__await__()`和遍历结果集来控制的。当协程结束并返回时，迭代器抛出`StopIteration`异常，异常的值属性就是这个返回值。如果协程抛出异常，它会通过迭代器传播。协程不应该直接抛出未经捕获的`StopIteration`异常。  
+
+就像生成器一样，协程还有下边这些方法（详情查看，生成器-迭代器方法）。但是和生成器不一样，协程不能直接支持迭代操作。
+
+在Python 3.5.2中的修改：`RuntimeError`会多次等待协程。
+
+* coroutine.send(value)  
+    Starts or resumes execution of the coroutine. If value is None, this is equivalent to advancing the iterator returned by __await__(). If value is not None, this method delegates to the send() method of the iterator that caused the coroutine to suspend. The result (return value, StopIteration, or other exception) is the same as when iterating over the __await__() return value, described above.
+    
+    
+* coroutine.throw(type[, value[, traceback]])  
+    Raises the specified exception in the coroutine. This method delegates to the throw() method of the iterator that caused the coroutine to suspend, if it has such a method. Otherwise, the exception is raised at the suspension point. The result (return value, StopIteration, or other exception) is the same as when iterating over the __await__() return value, described above. If the exception is not caught in the coroutine, it propagates back to the caller.  
+    在协程中抛出指定异常。
+    
+* coroutine.close()  
+    Causes the coroutine to clean itself up and exit. If the coroutine is suspended, this method first delegates to the close() method of the iterator that caused the coroutine to suspend, if it has such a method. Then it raises GeneratorExit at the suspension point, causing the coroutine to immediately clean itself up. Finally, the coroutine is marked as having finished executing, even if it was never started.
+    调用这个方法将导致协程被清理并退出。
+
+###### 4.3. 异步迭代器
+一个异步迭代器可以调用在实现它的`__aiter__`时，调用异步代码，一个异步迭代器可以在它的`__anext__`方法里调用异步代码。
+
+异步迭代器可以在`async for`语句中使用。
+
+* object.__aiter__(self)  
+    必须返回一个异步迭代器对象。
+
+* object.__anext__(self)  
+    迭代器返回的下一个值必须是一个可等待的，当迭代操作结束时会抛出一个`StopAsyncIteration`错误。
+    
+异步迭代器的例子
+
+```
+class Reader:
+    async def readline(self):
+        ...
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        val = await self.readline()
+        if val == b'':
+            raise StopAsyncIteration
+        return val
+```
+在Python 3.5版中中新增。
+
+
+
+
+###### 4.4. 异步上下文管理器  
+
+异步上下文管理器可以在它的`__aenter__`和`__aexit__`方法中延迟执行。
+
+异步上下文管理器可以在`async with`语句中使用。
+
+* object.__aenter__(self)  
+    这个方法在语义上与`__enter__()`类似，唯一的区别就是它必须返回一个可等待对象。
+    
+* object.__aexit__(self, exc_type, exc_value, traceback)  
+    这个方法在语义上与`__exit__()`类似，唯一的区别就是它必须返回一个可等待对象。
+    
+异步上下文管理器的例子
+
+```
+class AsyncContextManager:
+    async def __aenter__(self):
+        await log('entering context')
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await log('exiting context')
+```
+
+在Python 3.5版中中新增。  
+
+```
+注意：
+在Python 3.5.2版中的修改: 从CPython 3.5.2开始，__aiter__ 可以返回异步迭代器。返回一个可等待对象会导致 PendingDeprecationWarning 。
+
+在CPython 3.5.x中为了保证向后兼容，推荐继续返回可等待对象在 __aiter__ 中。如果你想避免 PendingDeprecationWarning 同时也想保持向后兼容，可以用下边的装饰器：
+
+import functools
+import sys
+
+if sys.version_info < (3, 5, 2):
+    def aiter_compat(func):
+        @functools.wraps(func)
+        async def wrapper(self):
+            return func(self)
+        return wrapper
+else:
+    def aiter_compat(func):
+        return func
+
+例子：
+
+class AsyncIterator:
+
+    @aiter_compat
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        ...
+	
+从CPython 3.6开始，PendingDeprecationWarning 将被 DeprecationWarning 替换。在CPython 3.7中，从 __aiter__ 返回一个可等待对象将会导致 RuntimeError。
+
+```
 
 ----
 半抄袭，半翻译终于搞完。  
