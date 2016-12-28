@@ -3,7 +3,7 @@ keywords = [
   "golang"
 ]
 description = "Golang开发环境设置"
-author = "author"
+author = "asdfsx"
 draft = false
 date = "2016-12-10T16:45:16+08:00"
 title = "Golang开发环境设置"

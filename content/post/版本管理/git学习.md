@@ -3,7 +3,7 @@ keywords = [
   "git"
 ]
 description = "git"
-author = "author"
+author = "asdfsx"
 draft = false
 type = "post"
 date = "2016-12-08T17:05:34+08:00"
