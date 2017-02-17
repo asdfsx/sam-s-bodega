@@ -25,7 +25,7 @@ draft = false
 
 Python把数据抽象为Objects。Python程序中所有的数据都体现为对象，或者对象之间的关系。(从某种程度上讲，为了与冯.诺伊曼的`存储程序型计算机`模型相一致，代码同样也体现为对象。)
 
-每个对象都有自己的标识，一个类型和一个值。对象一旦创建，它的标识就不会变更；你可以理解为它就像对象在内存中的地址。`is`操作用来比较两个对象的标识；`id()`函数返回一个整数来表示它的标识。
+每个对象都有一个标识，一个类型和一个值。对象一旦创建，它的标识就不会变更；你可以理解为它就像对象在内存中的地址。`is`操作用来比较两个对象的标识；`id()`函数返回一个整数来表示它的标识。
 
 CPython实现细节：id(x)返回x在内存的存放地址。
 
@@ -281,7 +281,7 @@ CPython实现细节：CPython现在使用引用计数机制和（可选的）循
     * Class method objects  
     类方法对象，就像静态方法对象，是另外一个对象的包装，通过这个包装可以改变从类和泪实例中检索对象的行为。检索累方法对象的行为已经在上边描述过，在`User-defined methods`部分。类方法对象是由内建构造器`classmethod()`创建的。
 
-# 3.特殊方法的名字
+# 3.特殊名字的方法
 
 通过定义名字特殊的方法，一个类能够实现特殊语法所调用的操作（例如算术运算，下标及切片操作）。这是Python式的运算符重载`operator overloading`，让类可以定义自己的行为并充分利用语言中的操作符。例如，一个类如果定义了方法`__getitem__()`，然后`x`是这个类的实例，那么`x[i]`基本上就等于`type(x).__getitem__(x, i)`。除非特别标示，在没有适当定义方法的类上执行操作会导致抛出异常，一般是`AttributeError`或者`TypeError`。
  
@@ -289,7 +289,7 @@ CPython实现细节：CPython现在使用引用计数机制和（可选的）循
 
 #### 3.1 基础定制  
 * object.\_\_new\_\_(cls[, ...])  
-    调用时创建类`cls`的实例。`__new()`是一个静态方法（特殊函数所以你不需要定义），第一个参数是需要创建实例等类。其余的参数会创递给实例构造器（调用类）。`__new()__`的返回值是类的新对象实例（通常是`cls`的实例）。  
+    调用时创建类`cls`的实例。`__new()`是一个静态方法（特殊函数所以你不需要定义），第一个参数是需要创建实例等类。其余的参数会创递给实例构造器（调用类）。`__new__()`的返回值是类的新对象实例（通常是`cls`的实例）。  
 
     常见的情况下是通过`super(currentclass, cls).__new__(cls[, ...])`的方式，传递对应的参数调用父类的`__new__()`的来实现创建一个类的新实例，然后再返回实例之前根据需求对实例进行相应的修改。  
     
@@ -414,7 +414,25 @@ CPython实现细节：CPython现在使用引用计数机制和（可选的）循
         
 ##### 3.2.2 使用描述
 ##### 3.2.3 \_\_slots\_\_
-###### 3.2.3.1 使用\_\_slots\_\_的注意事项
+默认情况下，类实例使用字典管理属性。在对象只有少量实例变量时这就会占用不少空间。当有大量实例时，空间消耗会变得更为严重。
+
+这个默认行为可以通过在类定义中定义`__slots__`修改。`__slots__`声明只为该类的所有实例预留刚刚够用的空间。因为不会为每个实例创建`__dict__`，因此空间节省下来了。
+
+* object.\_\_slots\_\_  
+    这个类变量可以赋值为一个字符串，一个可迭代对象。或者一个字符串序列（每个字符串表示实例所用的变量名）。如果定义了`__slots__`，Python就会为实例预留出存储声明变量的空间，并且不会为每个实例自动创建`__dict__`和`__weakref__`。  
+
+
+###### 3.2.3.1 使用\_\_slots\_\_的注意事项  
+
+* 如果从一个没有定义`__slots__`的基类继承，子类一定存在`__dict__`属性。所以，在这种子类中定义`__slots__`是没有意义的。
+* 没有定义`__dict__`的实例不支持对不在`__slot__`中的属性赋值。如果需要支持这个功能, 可以把`__dict__`放到`__slots__`声明中。
+* 没有定义`__weakref__`的，使用`__slot__`的实例不支持对它的 “弱引用”。如果需要支持弱引用，可以把`__weakref__`放到`__slots__`声明中。
+* `__slots__`是在类这一级实现的，通过为每个实例创建描述符 (实现描述符)。因此，不能使用类属性为实例的`__slots__`中定义的属性设置默认值。否则，类属性会覆盖描述符的赋值操作。
+* `__slots__`声明的行为只限于其定义所在的类。因此，如果子类没有定义自己的`__slots__`(它必须只包括那些 额外的`slots`)，子类仍然会使用`__dict__`。
+* 如果类定义的`slot`与父类中的相同，那么父类`slot`中的变量将成为不可访问的 (除非直接从基类中获取描述符)。这使得程序行为变得有一点模糊，以后可能会增加一个防止出现这种情况的检查。
+* 从“变长”内建类型，例如`int`、`str`和`tuple`继承的子类的非空`__slots__`不会起作用。
+* 任何非字符串可迭代对象都可以赋给`__slots__`。映射类型也是允许的，但是，以后版本的Python可能给 “键” 赋予特殊意义。
+* 只有在两个类的`__slots__`相同时，`__class__`赋值才会正常工作。
 
 #### 3.3 定制类的生成  
 默认情况下，类是由`type()`来构建的。类的实体是在新的名字空间中执行，而且类的名字是与`type(name, bases, namespace)`的结果绑定的。  
@@ -480,7 +498,7 @@ Introduced the __prepare__ namespace hook
 当一个新的类通过`type.__new__`被创建，新的类对象将名字空间参数复制到一个标准的Python字典中，然后将原始的类对象抛弃。新复制的字典成为类对象的`__dict__`属性。
         
 ##### 3.3.5 `Metaclass`实例  
-`metaclass`的可能使用方式是无限的。有些方法已经被验证过了比如，日志、接口检查、自动授权、自动创建参数、代理、框架、自动资源锁／同步。  
+`metaclass`的使用方式是五花八门的。有些方法已经被验证过了比如，日志、接口检查、自动授权、自动创建参数、代理、框架、自动资源锁／同步。  
 
 这里给出一个`metaclass`的例子，使用`collections.OrderedDict`来记录类中的变量被创建的顺序。  
     
@@ -526,7 +544,7 @@ PEP 3119 - Introducing Abstract Base Classes　 (抽象基类介绍)
 ```
 
 #### 3.5 模拟可调用对象
-    * object.\_\_call\_\_(self[, args...])  
+* object.\_\_call\_\_(self[, args...])  
     当实例作为函式使用时调用本方法。如果定义了这个方法，`x(arg1, arg2,...)`就相当于`x.__call__(arg1, arg2,...)`。
 
 #### 3.6 模拟容器类型
@@ -541,6 +559,8 @@ PEP 3119 - Introducing Abstract Base Classes　 (抽象基类介绍)
 * object.\_\_contains\_\_(self, item)
 
 #### 3.7 模拟数字类型
+以下方法用于模拟数值类型。不同数值类型所支持的操作符并不完全相同，如果一个类型不支持某些操作符（例如非整数值上的位运算），对应的方法就不应该被实现。
+
 * object.\_\_add\_\_(self, other)  
 object.\_\_sub\_\_(self, other)  
 object.\_\_mul\_\_(self, other)  
@@ -555,6 +575,9 @@ object.\_\_rshift\_\_(self, other)
 object.\_\_and\_\_(self, other)  
 object.\_\_xor\_\_(self, other)  
 object.\_\_or\_\_(self, other)  
+    这些方法用于二元算术操作（+，-，*，/，//，%，divmod()，pow()，**，<<，>>，&，^，|）。 例如，在计算表达式`x + y`时,`x`是一个定义了`__add__()`的类的实例，那么就会调用`x.__add__(y)`。方法`__divmod__()`应该与使用 `__floordiv__()`和`__mod__()`的结果相同，但应该与`__truediv__()`无关。注意如果要支持三参数版本的内建函式`pow()`的话，方法`__pow__()`应该被定义成可以接受第三个可选参数的。
+
+    如果以上任一方法无法处理根据参数完成计算的话，就应该返回`NotImplemented`。
 
 * object.\_\_radd\_\_(self, other)  
 object.\_\_rsub\_\_(self, other)  
@@ -570,6 +593,9 @@ object.\_\_rrshift\_\_(self, other)
 object.\_\_rand\_\_(self, other)  
 object.\_\_rxor\_\_(self, other)  
 object.\_\_ror\_\_(self, other)  
+    这些方法用于实现二元算术操作（+，-，*，/，//，%，divmod()，pow()，**，<<，>>，&，^，|），但用于操作数反射（即参数顺序是相反的）。这些函式只有在左操作数不支持相应操作，并且是参数是不同类型时才会被使用。例如，计算表达式`x - y`，`y`是一个定义了方法`__rsub__()`的类实例，那么在 x.__sub__(y) 返回`NotImplemented`时才会调用`y.__rsub__(x)`。
+
+    注意三参数版本的`pow()`不会试图调用`__rpow__()`。（这会导致类型自动转换规则过于复杂）
 
 * object.\_\_iadd\_\_(self, other)  
 object.\_\_isub\_\_(self, other)  
@@ -584,18 +610,22 @@ object.\_\_irshift\_\_(self, other)
 object.\_\_iand\_\_(self, other)  
 object.\_\_ixor\_\_(self, other)  
 object.\_\_ior\_\_(self, other)  
+    这些方法用于实现参数化算术赋值操作（+=，-=，*=，/=，//=，%=，**=，<<=，>>=，&=，^=，|=）。这些方法应该是就地操作的（即直接修改`self`）并返回结果（一般来讲，这里应该是对`self`直接操作，但并不是一定要求如此）。如果没有实现某个对应方法的话，参数化赋值会蜕化为正常方法。例如，执行语句`x += y`时，`x`是一个实现了 `__iadd__()`方法的实例，`x.__iadd__(y)`就会被调用。如果`x`没有定义 `__iadd__()`，就会选择`x.__add__(y)`或者`y.__radd__(x)`，与`x + y`类似。  
 
 * object.\_\_neg\_\_(self)  
 object.\_\_pos\_\_(self)  
 object.\_\_abs\_\_(self)  
 object.\_\_invert\_\_(self)  
+    用于实现一元算术操作（-，+，`abs()`和~）。  
 
 * object.\_\_complex\_\_(self)  
 object.\_\_int\_\_(self)  
 object.\_\_float\_\_(self)  
 object.\_\_round\_\_(self[, n])  
+    用于实现内建函式`complex()`，`int()`，`float()`和`round()`。应该返回对应的类型值。  
 
-* object.\_\_index\_\_(self)
+* object.\_\_index\_\_(self)  
+    用于实现函式`operator.index()`，或者在Python需要一个整数对象时调用（例如在分片时（slicing），或者在内建函式函式`bin()`，`hex()`和`oct()`中）。这个方法必须返回一个整数。  
 
 #### 3.8 With语句和上下文管理器  
 上下文管理器`context manager`是一个对象，这个对象定义了执行`with`语句时要建立的运行时上下文。上下文管理器负责处理执行某代码块时对应的运行时上下文进入和退出。运行时上下文的使用一般通过`with`语句（参见`with`语句），但也可以直接调用它的方法。  
@@ -710,16 +740,13 @@ Metaclass getattribute invoked
 在Python 3.5.2中的修改：`RuntimeError`会多次等待协程。
 
 * coroutine.send(value)  
-    Starts or resumes execution of the coroutine. If value is None, this is equivalent to advancing the iterator returned by __await__(). If value is not None, this method delegates to the send() method of the iterator that caused the coroutine to suspend. The result (return value, StopIteration, or other exception) is the same as when iterating over the __await__() return value, described above.
-    
+    开始或者恢复协程的运行。如果`value`为`None`。如果`value`不是`None`，这个方法会调用导致这个协程挂起的迭代器的`send()`方法。结果（返回值、`StopIteration`、或其它异常）与迭代时`__await__()`的返回值时一样的。    
     
 * coroutine.throw(type[, value[, traceback]])  
-    Raises the specified exception in the coroutine. This method delegates to the throw() method of the iterator that caused the coroutine to suspend, if it has such a method. Otherwise, the exception is raised at the suspension point. The result (return value, StopIteration, or other exception) is the same as when iterating over the __await__() return value, described above. If the exception is not caught in the coroutine, it propagates back to the caller.  
-    在协程中抛出指定异常。
+    在协程中抛出指定异常。这个方法会调用造成协程挂起的迭代器的`throw`方法，如果这个迭代器有这个方法。否则就在挂起位置抛出异常。结果（返回值、`StopIteration`、或其它异常）与迭代时`__await__()`的返回值时一样的。如果协程中没有捕获异常，它会传递给调用者。
     
 * coroutine.close()  
-    Causes the coroutine to clean itself up and exit. If the coroutine is suspended, this method first delegates to the close() method of the iterator that caused the coroutine to suspend, if it has such a method. Then it raises GeneratorExit at the suspension point, causing the coroutine to immediately clean itself up. Finally, the coroutine is marked as having finished executing, even if it was never started.
-    调用这个方法将导致协程被清理并退出。
+    调用这个方法将导致协程被清理并退出。如果协程已被挂起，要先执行造成协程挂起的迭代器的`close`函数，如果迭代器有这个函数的话。然后它会在挂起位置抛出`GeneratorExit`异常，这会造成协程立刻清理自己。最后，这个协程被标记为已完成，哪怕它从来没有执行过。
 
 ###### 4.3. 异步迭代器
 一个异步迭代器可以调用在实现它的`__aiter__`时，调用异步代码，一个异步迭代器可以在它的`__anext__`方法里调用异步代码。
@@ -813,8 +840,10 @@ class AsyncIterator:
 ```
 
 ----
-半抄袭，半翻译终于搞完。  
+半抄袭，半翻译，一点点完善把。  
 其实新版文档已经更新了很多内容，抄袭过来的东西反而有可能有问题。  
-而自己翻译的内容～～～反正metaclass那部分，有几段我自己都看晕了  
+而自己翻译的内容～～～反正metaclass那部分，有几段我自己都看晕了。  
+不管怎么说，至少是帮助自己深入的了解了一下Python。  
+自己凑合着看吧。  
 https://docs.python.org/3/reference/datamodel.html  
 http://docspy3zh.readthedocs.io/en/latest/reference/datamodel.html

@@ -17,20 +17,44 @@ author = "asdfsx"
 
 +++
 
+# 变量
+变量就是一个用来保存值的存储空间。其中能存放的值与变量的类型一致。
+
+在函数声明时可以为函数参数和返回值定义变量，这会为已命名的变量预留存储空间。调用内建函数`new`或者使用复合类型的地址可以在运行时获得存储空间。这样的匿名变量是通过指针直接或间接使用的。
+
+结构化类型的变量，如数组、切片和结构体，都包含多个元素或者字段，它们的地址都是独立的。每个元素就像变量一样。
+
+变量的静态类型在声明的时候定义，也可以通过一下的方式提供：通过调用`new`或者复合字面量，或者结构化类型中元素的类型。接口类型的变量同样也有独特的动态类型，就是在运行时分配给变量的值的类型（预定义的标识符`nil`除外,因为它没有类型）。动态类型可能会在计算时发生变化，但是存储在接口变量中的值总是可以赋给变量的静态类型。
+
+```
+var x interface{}  // x is nil and has static type interface{}
+var v *T           // v has value nil, static type *T
+x = 42             // x has value 42 and dynamic type int
+x = v              // x has value (*T)(nil) and dynamic type *T
+```
+
+在表达式中，变量的值可以通过变量来获得；它只是最后一次赋予变量的值。如果一个变量还没有被赋值，它的值就是所属类型的`0`值。
+
 # 类型
 
 一种类型决定一个值的可能的取值范围以及能对这个值所支持的操作。类型有可能是已命名的(named)也可能是未命名的（unnamed）。已命名的类型会有类型名称；未命名点类型可以用`type`来定义，用已有的类型来组成新的类型。
 
+```
+Type      = TypeName | TypeLit | "(" Type ")" .
+TypeName  = identifier | QualifiedIdent .
+TypeLit   = ArrayType | StructType | PointerType | FunctionType | InterfaceType |
+	    SliceType | MapType | ChannelType .
+```
+
 已命名的实例：布尔、数字、字符串都是预定义的。复合类型--数组、结构体、指针、函数、接口、切片、字典、管道类型--可能需要用类型字面量来定义。
 
 
-### 方法集
+###  方法集
 
 一个类型可能会有一个和它相关的方法集合。一个接口类型的方法集就是它的接口。其他的类型`T`的方法集是由那些接收者（参见方法定义）为`T`的方法组合而成的。指针类型`*T`的方法集是由哪些接收者是`*T`或者`T`的方法组合而成（也就是说它包含了`T`的方法集）。
 
 
-常量声明
-----
+# 常量声明
 
 ```
 const Pi float64 = 3.14159265358979323846
@@ -43,8 +67,7 @@ const a, b, c = 3, 4, "foo"  // a = 3, b = 4, c = "foo", untyped integer and str
 const u, v float32 = 0, 3    // u = 0.0, v = 3.0
 ```
 
-变量声明
-----
+# 变量声明
 
 ```
 var i int
@@ -90,106 +113,140 @@ a, a := 1, 2                              // illegal: double declaration of a or
 简单说，只要里边有一个变量是之前没有用过的，就没有问题。
 
 
-数据类型
-----
+# 数据类型
+
 * Boolean
 
-布尔类型的声明和操作
+    布尔类型的声明和操作
 
-```
-var a bool = false
-b := true 
-c := a == b
-c = a != b
-c = !a
-c = a && b
-c = a || b
-```
+    ```
+    var a bool = false
+    b := true 
+    c := a == b
+    c = a != b
+    c = !a
+    c = a && b
+    c = a || b
+    ```
 
 * Numeric  
 
-数字类型如下：
+    数字类型如下：
 
-```
-uint8       the set of all unsigned  8-bit integers (0 to 255)
-uint16      the set of all unsigned 16-bit integers (0 to 65535)
-uint32      the set of all unsigned 32-bit integers (0 to 4294967295)
-uint64      the set of all unsigned 64-bit integers (0 to 18446744073709551615)
+    ```
+    uint8       the set of all unsigned  8-bit integers (0 to 255)
+    uint16      the set of all unsigned 16-bit integers (0 to 65535)
+    uint32      the set of all unsigned 32-bit integers (0 to 4294967295)
+    uint64      the set of all unsigned 64-bit integers (0 to 18446744073709551615)
 
-int8        the set of all signed  8-bit integers (-128 to 127)
-int16       the set of all signed 16-bit integers (-32768 to 32767)
-int32       the set of all signed 32-bit integers (-2147483648 to 2147483647)
-int64       the set of all signed 64-bit integers (-9223372036854775808 to 9223372036854775807)
+    int8        the set of all signed  8-bit integers (-128 to 127)
+    int16       the set of all signed 16-bit integers (-32768 to 32767)
+    int32       the set of all signed 32-bit integers (-2147483648 to 2147483647)
+    int64       the set of all signed 64-bit integers (-9223372036854775808 to 9223372036854775807)
 
-float32     the set of all IEEE-754 32-bit floating-point numbers
-float64     the set of all IEEE-754 64-bit floating-point numbers
+    float32     the set of all IEEE-754 32-bit floating-point numbers
+    float64     the set of all IEEE-754 64-bit floating-point numbers
 
-complex64   the set of all complex numbers with float32 real and imaginary parts
-complex128  the set of all complex numbers with float64 real and imaginary parts
+    complex64   the set of all complex numbers with float32 real and imaginary parts
+    complex128  the set of all complex numbers with float64 real and imaginary parts
 
-byte        alias for uint8
-rune        alias for int32
+    byte        alias for uint8
+    rune        alias for int32
 
 
-uint     either 32 or 64 bits
-int      same size as uint
-uintptr  an unsigned integer large enough to store the uninterpreted bits of a pointer value
-```
+    uint     either 32 or 64 bits
+    int      same size as uint
+    uintptr  an unsigned integer large enough to store the uninterpreted bits of a pointer value
+    ```
 
-变量声明及操作
+    变量声明及操作
 
-```
-var a int
-var b uint16 = 20
-var c uint32
-c = uint32(b)
+    ```
+    var a int
+    var b uint16 = 20
+    var c uint32
+    c = uint32(b)
 
-var c1 complex64 = 5 + 10i
-```
+    var c1 complex64 = 5 + 10i
+    ```
 
-整数支持位运算
+    整数支持位运算
 
-```
-1 & 1 //按位与
-0 & 1 //按位与
-1 | 1 //按位或
-0 | 1 //按位或
-1 ^ 1 //按位异或
-1 ^ 0 //按位异或
-1<<10 //位左移
-2>>1  //位右移
-```
+    ```
+    1 & 1 //按位与
+    0 & 1 //按位与
+    1 | 1 //按位或
+    0 | 1 //按位或
+    1 ^ 1 //按位异或
+    1 ^ 0 //按位异或
+    1<<10 //位左移
+    2>>1  //位右移
+    ```
 
-配合iota
+    配合iota
 
-```
-type ByteSize float64const (_ = iota // 通过赋值给空白标识符来忽略值 KB ByteSize = 1<<(10*iota)MBGBTB 
-PB 
-EB 
-ZB 
-YB)
+    ```
+    type ByteSize float64    const (        _ = iota // 通过赋值给空白标识符来忽略值 KB ByteSize = 1<<(10*iota)        MB        GB        TB 
+        PB 
+        EB 
+        ZB 
+        YB    )
 
-type BitFlag intconst (    Active BitFlag = 1 << iota // 1 << 0 == 1    Send // 1 << 1 == 2    Receive // 1 << 2 == 4)flag := Active | Send // == 3
-```
-还有`+ - * / % ++ -- += -= *= /= %=`等常规的数值计算  
-还有`> < == >= <= !=`等常规数值比较
+    type BitFlag int    const (        Active BitFlag = 1 << iota // 1 << 0 == 1        Send // 1 << 1 == 2        Receive // 1 << 2 == 4    )    flag := Active | Send // == 3
+    ```
+    还有`+ - * / % ++ -- += -= *= /= %=`等常规的数值计算  
+    还有`> < == >= <= !=`等常规数值比较
 
-另外字符类型可以用int来表示
+    另外字符类型可以用int来表示
 
-```
-var ch int = '\u0041'var ch2 int = '\u03B2'var ch3 int = '\U00101234'
-fmt.Printf("%d - %d - %d\n", ch, ch2, ch3) // integerfmt.Printf("%c - %c - %c\n", ch, ch2, ch3) // characterfmt.Printf("%X - %X - %X\n", ch, ch2, ch3) // UTF-8 bytesfmt.Printf("%U - %U - %U", ch, ch2, ch3) // UTF-8 code point
-```
+    ```
+    var ch int = '\u0041'    var ch2 int = '\u03B2'    var ch3 int = '\U00101234'
+    fmt.Printf("%d - %d - %d\n", ch, ch2, ch3) // integer    fmt.Printf("%c - %c - %c\n", ch, ch2, ch3) // character    fmt.Printf("%X - %X - %X\n", ch, ch2, ch3) // UTF-8 bytes    fmt.Printf("%U - %U - %U", ch, ch2, ch3) // UTF-8 code point
+    ```
 
 * String
 
-字符串由字节序列组成，一旦创建，它的内容就不可改变；它的长度由函数`len`获得；字符串里的字节可以用下标访问；不能获取字符串里的字节的地址,`&s[i]`是不合法的。
+    字符串由字节序列组成，一旦创建，它的内容就不可改变；它的长度由函数`len`获得；字符串里的字节可以用下标访问；不能获取字符串里的字节的地址,`&s[i]`是不合法的。
 
-```
-var a string = "hello"
-l := len(a)
-c := a[0]
-```
+    变量声明与操作：
+
+    ```
+    var a string = "hello"
+    l := len(a)
+    c := a[0]
+    s:= "hel" + "lo"
+    s += " world!"
+    ```
+    
+    更多的字符串操作可以通过包`strings`和`strconv`来实现。
+    
+    ```
+    strings.HasPrefix(s, prefix string) bool
+    strings.HasSuffix(s, prefix string) bool
+    strings.Contains(s, substr string) bool
+    strings.Index(s, str string) int
+    strings.LastIndex(s, str string) int
+    strings.IndexRune(s string, r, rune) int
+    strings.Replace(str, old, new, n) string
+    strings.Count(s, str string) int
+    strings.Repeat(s, count int) string
+    strings.ToLower(s) string
+    strings.ToHigher(s) string
+    strings.TrimSpace(s string) string
+    strings.Trim(s string, trim string) string
+    strings.TrimLeft
+    strings.TrimRight
+    strings.Fields(s) []string
+    strings.Split(s, sep) []string
+    strings.Join(sl []string, sep string) string
+    strings.NewReader(s string) Reader
+    
+    strconv.IntSize()
+    strconv.Itoa(i int) string
+    strconv.Atoi(s string) (i int, err error)
+    strconv.FormatFloat(f float64, fmt byte, prec int, bitsize int) string
+    strconv.ParseFloat(s string, bitsize int) (f float64, err error)
+    ```
 
 * Array
 

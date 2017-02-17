@@ -83,13 +83,13 @@ def start(preload=None, stop=False):
 * 处理定时任务的线程  
     在`cron_spawn`函数中创建的，按照配置中的`max_cron_threads`来创建`daemon`线程。线程中通过遍历`odoo.modules.registry.Registry.registries`来获得数据库信息，然后通过`odoo.addons.base.ir.ir_cron.ir_cron._acquire_job`来获取定时任务。
 
-### 基于gevent的实现 odoo.service.server. GeventServer
+### 基于gevent的实现 odoo.service.server.GeventServer
 
 gevent是一个基于协程的网络库。底层使用greenlet作为轻量级的异步并法方式，使用libev实现基于事件循环的网络请求处理。
 
 GeventServer实现非常简单，感觉和Thread、Process的方案比，感觉缺了些东西。（比如进程、线程版里都会有cron_xxx，目测应该是执行定时任务的程序。）
 
-### 基于进程的实现 odoo.service.server. PreforkServer
+### 基于进程的实现 odoo.service.server.PreforkServer
 
 让人又爱又恨的进程。与上边的两个实现相比，进程要靠自己一点点实现
 
@@ -113,10 +113,43 @@ GeventServer实现非常简单，感觉和Thread、Process的方案比，感觉�
 * WorkerCron  
     处理定时任务的子进程。执行完任务后退出。（这里和线程的实现不一样。线程里是死循环；进程则是执行完就退出，然后由主进程再次拉起？？？待确认啊～～）
     
+
+### 预加载模型 preload_registries
+在之后的文章中，我们可以看到`registry`的重要性。在这里我们只需要明确，不管是进程、还是线程的实现，都会在启动服务器时调用这个函数创建`registry`。
+
+```
+def preload_registries(dbnames):
+    """ Preload a registries, possibly run a test file."""
+    # TODO: move all config checks to args dont check tools.config here
+    config = odoo.tools.config
+    test_file = config['test_file']
+    dbnames = dbnames or []
+    rc = 0
+    for dbname in dbnames:
+        try:
+            update_module = config['init'] or config['update']
+            registry = Registry.new(dbname, update_module=update_module)
+            # run test_file if provided
+            if test_file:
+                _logger.info('loading test file %s', test_file)
+                with odoo.api.Environment.manage():
+                    if test_file.endswith('yml'):
+                        load_test_file_yml(registry, test_file)
+                    elif test_file.endswith('py'):
+                        load_test_file_py(registry, test_file)
+
+            if registry._assertion_report.failures:
+                rc += 1
+        except Exception:
+            _logger.critical('Failed to initialize database `%s`.', dbname, exc_info=True)
+            return -1
+    return rc
+```
+    
 ### 文件系统监视器 FSWatcher
 使用`watchdog`监视指定目录中发生的文件创建、删除、修改事件。主要是为了模块的动态更新。
 
-### 处理请求的wsgi_server
+### 处理请求的 wsgi_server
 之前说的3种server，都使用了`odoo.service.wsgi_server.application`来处理请求。
 
 ```
@@ -140,7 +173,7 @@ def application_unproxied(environ, start_response):
 
 所有的请求都会尝试用2个handler来处理一下。`wsgi_xmlrpc`用来处理xmlrpc，只有`POST`类型的、url以`/xmlrpc/`开头的会被这个handler处理。其余的都由`odoo.http.root`来处理。看来`odoo.http.root`应该超级复杂。
 
-### 超级长的`odoo.http`
+### 超级长的 odoo.http
 这是一个1651行的，历史悠久的python文件。第一行`# -*- coding: utf-8 -*-`是2013年2月1日写下的。里边集中了请求的封装、模块加载、session管理等东西。这里我们重点先看`root`。  
 
 首先，在文件的末尾找到`root = Root()`。`root`是一个`Root`的对象。哪一个对象怎么作为`handler`作为函数调用的呢？
@@ -158,7 +191,7 @@ class Root(object):
 
 原来是特殊的的`__call__`函数。而且可以看到模块是延迟加载的：只有在第一次被调用的时候才会`load_addons`。然后才会调用`dispatch`去处理请求。
 
-##### 加载模块 `load_addons`  
+##### 加载模块 load_addons  
 加载模块的步骤
 
 * 从`odoo.modules.module.ad_paths`下的所有目录里，获取所有的模块目录。
@@ -176,7 +209,7 @@ app = werkzeug.wsgi.SharedDataMiddleware(self.dispatch, statics, cache_timeout=S
 
 这里先用类中的`dispatch`函数，生成`werkzeug.wsgi.SharedDataMiddleware`的对象`app`；然后再用`app`生成一个`DisableCacheMiddleware`对象，替换掉原来的`dispatch`......
 
-##### 抽丝剥茧 `dispatch` 
+##### 抽丝剥茧 dispatch 
 在`load_addons`的最后，原先的`dispatch`函数被层层包裹（真的是两层）。
 最外边一层是`DisableCacheMiddleware`：
 
@@ -267,54 +300,132 @@ def registry(database_name=None):
     return modules.registry.Registry(database_name)
 ```
 
-##### 模块和数据库的连接器`Registry`
+##### 模型的注册表 Registry
+
 ```
 The registry is essentially a mapping between model names and model classes.
 There is one registry instance per database.
 ```
 官方文档对`Registry`的说明。
 
-在请求处理的过程中，创建`modules.registry.Registry`对象。这个是一个继承了`collections.Mapping`，高度定制化的类。在这个类中，创建了一个类的属性`registries`作为缓存来存放之后生成的`registry`。每次想获取`registry`对象的时候，都是先查询这个缓存。如果缓存中有现成的对象，直接返回，否则生成新的对象。
+在请求处理的过程中，如果`modules.registry.Registry`还没有实例，那么就创建一个。这个是一个继承了`collections.Mapping`，高度定制化的类。在这个类中，创建了一个类的属性`registries`作为缓存来存放之后生成的`registry`。每次想获取`registry`对象的时候，都是先查询这个缓存。如果缓存中有现成的对象，直接返回，否则生成新的对象。
+
+在创建registry的同时，还进行了模块的实例化：从模块中抽取模型、把模型保存到数据库、将模型的实例存到registry中。
+
+##### 请求的重定向
+通过对模块、以及`registry`的了解，我们可以继续探究之前的`ir_http`。
 
 ```
-class Registry(Mapping):
-    def __new__(cls, db_name):
-        """ Return the registry for the given database name."""
-        with cls._lock:
-            try:
-                return cls.registries[db_name]
-            except KeyError:
-                return cls.new(db_name)
-            finally:
-                # set db tracker - cleaned up at the WSGI dispatching phase in
-                # odoo.service.wsgi_server.application
-                threading.current_thread().dbname = db_name
-                
+ir_http = request.registry['ir.http']
+result = ir_http._dispatch()
+```
+
+从`registrty`中查找名字为`ir.http`的模型的对象。通过搜索我们找到这个名字对应的类是：`odoo.addons.base.ir.ir_http.IrHttp`，在这个类中，我们找到了这个`_dispatch`方法。可以看到它在初次执行时会将安装好的模块都加载到`odoo.http.routing_map`中。之后当请求到达的时候，从`routing_map`中获得`controller`，然后由controller来处理请求。
+
+```
+    @classmethod
+    def routing_map(cls):
+        if not hasattr(cls, '_routing_map'):
+            installed = request.registry._init_modules - {'web'}
+            mods = [''] + odoo.conf.server_wide_modules + sorted(installed)
+            cls._routing_map = http.routing_map(mods, False, converters=cls._get_converters())
+        return cls._routing_map
+        
+    @classmethod
+    def _find_handler(cls, return_rule=False):
+        return cls.routing_map().bind_to_environ(request.httprequest.environ).match(return_rule=return_rule)
+
+    @classmethod
+    def _dispatch(cls):
+        # locate the controller method
+        try:
+            rule, arguments = cls._find_handler(return_rule=True)
+            func = rule.endpoint
+        except werkzeug.exceptions.NotFound, e:
+            return cls._handle_exception(e)
+            
+        ......
+        
+        try:
+            request.set_handler(func, arguments, auth_method)
+            result = request.dispatch()
+        except Exception, e:
+            return cls._handle_exception(e)
+        return result
+```
+
+##### 创建请求的路由器 odoo.http.routing_map
+请求的路由信息是保存在`werkzeug.routing.Map`中的。而`routing_map`函数负责创建这个对象，然后通过遍历所有已安装的模块中的`controller`，将所有的路径信息都存放到这个对象中去。
+
+```
+def routing_map(modules, nodb_only, converters=None):
+    routing_map = werkzeug.routing.Map(strict_slashes=False, converters=converters)
+    ......
+    for module in modules:
+        for _, cls in controllers_per_module[module]:
+            o = cls()
+            members = inspect.getmembers(o, inspect.ismethod)
+            for _, mv in members:
+                ...
+                endpoint = EndPoint(mv, routing)
+                ...
+                routing_map.add(werkzeug.routing.Rule(url, endpoint=endpoint, methods=routing['methods'], **kw))
+    return routing_map
+```
+
+附一个`werkzeug.routing.Map`的例子：
+
+```
+from werkzeug.routing import Map, Rule, NotFound, RequestRedirect
+
+url_map = Map([
+    Rule('/', endpoint='blog/index'),
+    Rule('/<int:year>/', endpoint='blog/archive'),
+    Rule('/<int:year>/<int:month>/', endpoint='blog/archive'),
+    Rule('/<int:year>/<int:month>/<int:day>/', endpoint='blog/archive'),
+    Rule('/<int:year>/<int:month>/<int:day>/<slug>',
+         endpoint='blog/show_post'),
+    Rule('/about', endpoint='blog/about_me'),
+    Rule('/feeds/', endpoint='blog/feeds'),
+    Rule('/feeds/<feed_name>.rss', endpoint='blog/show_feed')
+])
+
+def application(environ, start_response):
+    urls = url_map.bind_to_environ(environ)
+    try:
+        endpoint, args = urls.match()
+    except HTTPException, e:
+        return e(environ, start_response)
+    start_response('200 OK', [('Content-Type', 'text/plain')])
+    return ['Rule points to %r with arguments %r' % (endpoint, args)]
+```
+
+至此我们终于可以将收到的请求，转发到对应的`controller`中了。
+
+##### Session 管理
+在http访问的过程中，session的管理是很重要的。目前在`odoo`中，使用了基于`werkzeug`的session实现。其中`session`的存储使用的是文件存储。不得不说这个对`odoo`的高可用是一个小小的障碍。不过现在已经有现成的模块可以将这个基于文件的`sessionstore`替换成`redisstore`。基本思路就是继承`odoo.http.Root`，用一个支持`redis`的`session_store`函数将原有的函数覆盖掉。
+
+项目地址：https://github.com/keerati/odoo-redis  
+
+```
+class OpenERPSession(werkzeug.contrib.sessions.Session):
+    def __init__(self, *args, **kwargs):
     ......
     
-    @classmethod
-    def new(cls, db_name, force_demo=False, status=None, update_module=False):
-        ...
-        registry = object.__new__(cls)
-        registry.init(db_name)
-        cls.delete(db_name)
-        cls.registries[db_name] = registry
-        ...
-        odoo.modules.load_modules(registry._db, force_demo, status, update_module)
-        ...
+class Root(object):
+    ......
+    @lazy_property
+    def session_store(self):
+        # Setup http sessions
+        path = odoo.tools.config.session_dir
+        _logger.debug('HTTP sessions stored in: %s', path)
+        return werkzeug.contrib.sessions.FilesystemSessionStore(path, session_class=OpenERPSession)
+        
 ```
-可以看到在创建registry的同时，还进行了模块的加载。之前在启动过程中只加载了`server_wide`模块，`web`和`web_kanban`。
-简单查看一下`odoo.modules.loading.load_modules`，里边介绍了加载的顺序：
 
-1. LOAD BASE (must be done before module dependencies can be computed for later steps)
-2. Mark other modules to be loaded/updated
-3. Load marked modules (skipping base which was done in STEP 1)
-4. Finish and cleanup installations
-5. Uninstall modules to remove
-6. verify custom views on every model
-7. call _register_hook on every model
-8. Run the post-install tests
-
-这里应该才是真正的加载模块，之前应该只是查询系统中所有的模块，并保存模块的信息。至此模块加载完成，然后就可以正式为各种请求服务了。
 ### 不算总结的总结
-到这里基本上就把`odoo server`的建立，以及处理请求的`dispatch`简单了解了一下。然后留下很多问题，模块是如何实现的、模块的注册机制、`Registry`到底是干什么的......继续抽丝剥茧。
+经过不断的补充，终于将web server弄完了。现在算是基本弄清了`odoo`的启动流程，模块是如何加载安装的，请求是如何被处理的。关于`registry`、`module`、`model`、`controller`等会单独开篇去详细研究。
+
+注意：  
+文中大部分的`模块加载`仅指`import`。  
+真正将其实例化，或者说从模块类 -> 模型／模块类实例，是在`registry`中创建的。

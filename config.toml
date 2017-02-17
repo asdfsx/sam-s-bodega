@@ -1,86 +1,96 @@
-# hostname (and path) to the root eg. http://spf13.com/
-baseurl = "http://asdfsx.github.io"
-
-# Site title
+baseurl = "https://asdfsx.github.io/"
 title = "asdfsx"
-
-# Copyright
-copyright = "(c) 2016 asdfsx."
-
-# Language
-languageCode = "en-EN"
-
-# Metadata format
-# "yaml", "toml", "json"
-metaDataFormat = "toml"
-
-# Theme to use (located in /themes/THEMENAME/)
-theme = "hyde-y"
-
-# Pagination
+author = "asdfsx"
+# Shown in the side menu
+copyright = "&copy; 2016. All rights reserved."
+canonifyurls = true
 paginate = 10
-paginatePath = "page"
 
-# Enable Disqus integration
-#disqusShortname = "your_disqus_shortname"
+[indexes]
+  tag = "tags"
+  #topic = "topics"
 
-#[permalinks]
-#    post = "/:year/:month/:day/:slug/"
-#    code = "/:slug/"
-
-[taxonomies]
-    tag = "tags"
-    topic = "topics"
-
-[author]
-    name = "yourname"
-    email = "yourname@example.com"
-
-#
-# All parameters below here are optional and can be mixed and matched.
-#
 [params]
-    # You can use markdown here.
-    brand = "asdfsx"
-    topline = "sam's bodega"
-    footline = "code with <i class='fa fa-heart'></i>"
+  # Shown in the home page
+  subtitle = "sam's bodega"
+  brand = "asdfsx"
+  googleAnalytics = "Your Google Analytics tracking ID"
+  disqus = "Your Disqus shortname"
+  # CSS name for highlight.js
+  highlightjs = "androidstudio"
+  dateFormat = "02 Jan 2006, 15:04"
+  # Include any custom CSS and/or JS files
+  # (relative to /static folder)
+  custom_css = ["css/my.css"]
+  custom_js = ["js/my.js"]
 
-    # Sidebar position
-    # false, true, "left", "right"
-    sidebar = "left"
+[menu]
+  # Shown in the side menu.
+  [[menu.main]]
+    name = "Home"
+    pre = "<i class='fa fa-home fa-fw'></i>"
+    weight = 0
+    identifier = "home"
+    url = "/"
+  [[menu.main]]
+    name = "Posts"
+    pre = "<i class='fa fa-list fa-fw'></i>"
+    weight = 1
+    identifier = "post"
+    url = "/post/"
+  [[menu.main]]
+    name = "Tags"
+    pre = "<i class='fa fa-list fa-fw'></i>"
+    weight = 2
+    url = "/tags/"
+  [[menu.main]]
+    name = "About"
+    pre = "<i class='fa fa-user fa-fw'></i>"
+    weight = 3
+    identifier = "about"
+    url = "/about/"
+  [[menu.main]]
+    name = "Contact"
+    pre = "<i class='fa fa-phone fa-fw'></i>"
+    weight = 4
+    url = "/contact/"
 
-    # Text for the top menu link, which goes the root URL for the site.
-    # Default (if omitted) is "Home".
-    home = "home"
+[social]
+  # Link your social networking accounts to the side menu
+  # by entering your username or ID.
 
-    # Select a syntax highight.
-    # Check the static/css/highlight directory for options.
-    highlight = "default"
+  # SNS microblogging
+  twitter = ""
+  gnusocial = "" # Specify href (e.g. https://quitter.se/yourusername)
+  facebook = ""
+  googleplus = "asdfsx"
+  weibo = "*"
+  tumblr = ""
 
-    # Google Analytics.
-    googleAnalytics = "Your Google Analytics tracking code"
+  # SNS photo/video sharing
 
-    # Sidebar social links.
-    github = "asdfsx" # Your Github profile ID
-    bitbucket = "" # Your Bitbucket profile ID
-    linkedin = "" # Your LinkedIn profile ID (from public URL)
-    googleplus = "" # Your Google+ profile ID
-    facebook = "" # Your Facebook profile ID
-    twitter = "" # Your Twitter profile ID
-    youtube = ""  # Your Youtube channel ID
-    flattr = ""  # populate with your flattr uid
-    flickr = "" # Your Flickr profile ID
-    vimeo = "" # Your Vimeo profile ID
+  # SNS career oriented
+  linkedin = ""
+  xing = ""
 
-    # Sidebar RSS link: will only show up if there is a RSS feed
-    # associated with the current page
-    rss = true
+  # SNS news
+  reddit = ""
+  hackernews = ""
 
-[blackfriday]
-    angledQuotes = true
-    fractions = false
-    hrefTargetBlank = false
-    latexDashes = true
-    plainIdAnchors = true
-    extensions = []
-    extensionmask = []
+  # Techie
+  github = "asdfsx"
+  bitbucket = "asdfsx"
+  stackoverflow = ""
+  serverfault = ""
+
+  # Gaming
+  steam = ""
+  mobygames = ""
+
+  # Music
+  lastfm = ""
+  discogs = ""
+
+  # Other
+  keybase = ""
+
