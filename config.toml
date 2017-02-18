@@ -5,6 +5,9 @@ author = "asdfsx"
 copyright = "&copy; 2016. All rights reserved."
 canonifyurls = true
 paginate = 10
+themesDir = "themes"
+theme = "blackburn"
+watch = true
 
 [indexes]
   tag = "tags"
