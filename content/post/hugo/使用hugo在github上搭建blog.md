@@ -42,6 +42,15 @@ description = "hugo的使用"
 ```
 执行命令的目录下会生成一个新目录localhost
 该站点的所有文件都保存在该目录下
+目录结构如下
+.
+├── archetypes
+├── config.toml
+├── content
+├── data
+├── layouts
+├── static
+└── themes
 ```
 
 给localhost下载一个theme  
@@ -161,16 +170,16 @@ paginatePath = "page"
 > hugo new post/first.md  
 
 ```
-先进入localhost目录，创建一篇文章。文章会在content目录里生成
+在localhost目录下执行该命令。文章会在content目录里生成
 ```
 
 启动hugo server  
 
-> hugo server --theme=hyde-y --buildDrafts --watch
+> hugo server --theme=blackburn --buildDrafts --watch
 
 生成静态资源  
 
-> hugo --theme=hyde-y --baseUrl=https://asdfsx.github.io/
+> hugo --theme=blackburn --baseUrl=https://asdfsx.github.io/
 
 
 ```
@@ -193,3 +202,4 @@ paginatePath = "page"
 > git push -u origin master  
 
 完成以上步骤以后就可以访问https://asdfsx.github.io
+
